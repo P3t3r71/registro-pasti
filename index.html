@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1976d2">
+<link rel="manifest" href="manifest.json">
+<title>Registro Pasti</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f4f6f8;color:#17212b}
+header{background:#1976d2;color:#fff;padding:18px 16px;position:sticky;top:0;z-index:5}
+h1{margin:0;font-size:22px}.sub{opacity:.9;margin-top:4px;font-size:14px}
+main{padding:14px;max-width:900px;margin:auto}.card{background:#fff;border-radius:14px;padding:14px;margin-bottom:14px;box-shadow:0 2px 8px #0001}
+label{font-weight:600;font-size:14px;display:block;margin-bottom:6px}
+input[type=date]{font-size:18px;padding:10px;border:1px solid #ccd3da;border-radius:9px;width:100%}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{border:1px solid #cfd6dc;padding:8px;text-align:center}th:first-child,td:first-child{text-align:left}
+th{background:#eef2f5}.name{font-weight:600}
+button{border:0;border-radius:9px;padding:9px 12px;font-weight:700;cursor:pointer}
+.meal{min-width:54px;background:#e9edf0;color:#555}.meal.yes{background:#c8f1d1;color:#146b2c}.meal.no{background:#ffd2d2;color:#9b1c1c}
+.actions{display:flex;gap:8px;flex-wrap:wrap}.primary{background:#1976d2;color:white}.secondary{background:#e7eaee;color:#222}
+.small{font-size:12px;color:#68737d}.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#222;color:white;padding:10px 15px;border-radius:20px;display:none;z-index:20}
+@media(max-width:600px){table{font-size:12px}th,td{padding:6px 4px}.meal{min-width:45px;padding:7px 5px}.name{max-width:130px;word-break:break-word}}
+</style>
+</head>
+<body>
+<header><h1>Registro Pasti</h1><div class="sub">Scuola dell'Infanzia</div></header>
+<main>
+<section class="card">
+<label for="date">Data del registro</label>
+<input id="date" type="date">
+<div class="actions" style="margin-top:10px">
+<button class="primary" onclick="generatePDF()">📄 Genera PDF</button>
+<button class="secondary" onclick="clearDay()">🗑️ Cancella giorno</button>
+</div>
+<p class="small">I dati dei registri vengono conservati localmente per 7 giorni. L'elenco dei bambini rimane.</p>
+</section>
+<section class="card">
+<table>
+<thead><tr><th>Nome e Cognome</th><th>Primo</th><th>Secondo</th><th>Contorno</th><th>Frutta</th></tr></thead>
+<tbody id="rows"></tbody>
+</table>
+</section>
+<section class="card">
+<div class="actions">
+<button class="secondary" onclick="setAll('yes')">Tutti SI</button>
+<button class="secondary" onclick="setAll('no')">Tutti NO</button>
+<button class="secondary" onclick="window.print()">🖨️ Stampa</button>
+</div>
+</section>
+</main>
+<div id="toast" class="toast"></div>
+<script>
+const children=["Adele Bari","Cesare Becatti","Cristina Boccuti","Mathias Carli","Paz Colombo","Brando Giorgi","Ines Morelli","Isabella Morrone","Filippo Paolini","Tiberio Pierini","Margherita Scarpelli","Ariele Terzani","Ludovica Vagnoni","Eleonora Zeppi"];
+const meals=["Primo","Secondo","Contorno","Frutta"];
+const dateEl=document.getElementById("date");
+dateEl.value=new Date().toISOString().slice(0,10);
+function key(){return "registro-"+dateEl.value}
+function load(){let d=JSON.parse(localStorage.getItem(key())||"{}");return d}
+function save(d){localStorage.setItem(key(),JSON.stringify(d));cleanup()}
+function cleanup(){
+ const cutoff=Date.now()-7*86400000;
+ Object.keys(localStorage).filter(k=>k.startsWith("registro-")).forEach(k=>{
+  const dt=Date.parse(k.replace("registro-","")+"T23:59:59");
+  if(dt<cutoff)localStorage.removeItem(k);
+ });
+}
+function render(){
+ const d=load(), tbody=document.getElementById("rows"); tbody.innerHTML="";
+ children.forEach((name,i)=>{
+  const tr=document.createElement("tr");
+  const td=document.createElement("td");td.className="name";td.textContent=name;tr.appendChild(td);
+  meals.forEach((m,j)=>{
+   const td=document.createElement("td"), b=document.createElement("button");
+   const v=d[i+"-"+j];
+   b.className="meal "+(v||""); b.textContent=v==="yes"?"SI":v==="no"?"NO":"—";
+   b.onclick=()=>{const nd=load();const k=i+"-"+j;nd[k]=nd[k]==="yes"?"no":nd[k]==="no"?undefined:"yes";if(nd[k]===undefined)delete nd[k];save(nd);render()};
+   td.appendChild(b);tr.appendChild(td);
+  });tbody.appendChild(tr);
+ });
+}
+function setAll(v){const d={};children.forEach((_,i)=>meals.forEach((_,j)=>d[i+"-"+j]=v));save(d);render();toast(v==="yes"?"Tutti impostati su SI":"Tutti impostati su NO")}
+function clearDay(){localStorage.removeItem(key());render();toast("Registro cancellato")}
+function toast(t){const e=document.getElementById("toast");e.textContent=t;e.style.display="block";setTimeout(()=>e.style.display="none",1600)}
+dateEl.onchange=render;
+function generatePDF(){
+ const d=load(), date=new Date(dateEl.value+"T12:00:00").toLocaleDateString("it-IT");
+ let rows=children.map((n,i)=>`<tr><td>${n}</td>${meals.map((_,j)=>`<td>${d[i+"-"+j]==="yes"?"SI":d[i+"-"+j]==="no"?"NO":""}</td>`).join("")}</tr>`).join("");
+ const w=window.open("","_blank");
+ w.document.write(`<html><head><title>Registro Pasti ${date}</title><style>
+ body{font-family:Arial;margin:25mm 15mm}h1{text-align:center;font-size:18px;margin-bottom:18px}
+ .date{margin-bottom:10px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #222;padding:7px;text-align:center;font-size:11px}th:first-child,td:first-child{text-align:left;width:42%}th{font-weight:bold}
+ @page{size:A4 portrait;margin:12mm}</style></head><body>
+ <h1>Registro Pasti - Scuola dell'Infanzia</h1><div class="date"><b>Data:</b> ${date}</div>
+ <table><thead><tr><th>Nome e Cognome</th><th>Primo</th><th>Secondo</th><th>Contorno</th><th>Frutta</th></tr></thead><tbody>${rows}</tbody></table>
+ <script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);
+ w.document.close();
+}
+cleanup();render();
+if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+</script>
+</body></html>
