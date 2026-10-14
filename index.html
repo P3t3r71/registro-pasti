@@ -82,12 +82,25 @@ function render(){
   meals.forEach((m,j)=>{
    const td=document.createElement("td"), b=document.createElement("button");
    const v=d[i+"-"+j];
-   b.className="meal "+(v||""); 
+   b.className="meal "+(v||"");
    const isCacca = j===4, isNanna = j===5;
    const icon = isCacca ? "💩" : isNanna ? "😴" : "";
-   b.textContent = v==="yes" ? (icon || "SI") : v==="no" ? "NO" : "—";
+   const labels={yes:"SI",no:"NO",poco:"Poco",meta:"Metà",abbondante:"Abbondante"};
+   b.textContent = (isCacca || isNanna) && v==="yes" ? icon : (labels[v] || "—");
    b.title = isCacca ? "Cacca" : isNanna ? "Nanna" : m;
-   b.onclick=()=>{const nd=load();const k=i+"-"+j;nd[k]=nd[k]==="yes"?"no":nd[k]==="no"?undefined:"yes";if(nd[k]===undefined)delete nd[k];save(nd);render()};
+   b.onclick=()=>{
+    const nd=load(), k=i+"-"+j;
+    if(j===0 || j===1){
+      const states=[undefined,"yes","no","poco","meta","abbondante"];
+      const idx=states.indexOf(nd[k]);
+      const next=states[(idx+1)%states.length];
+      if(next===undefined) delete nd[k]; else nd[k]=next;
+    } else {
+      const next=nd[k]==="yes"?"no":nd[k]==="no"?undefined:"yes";
+      if(next===undefined) delete nd[k]; else nd[k]=next;
+    }
+    save(nd);render()
+  };
    td.appendChild(b);tr.appendChild(td);
   });tbody.appendChild(tr);
  });
@@ -116,7 +129,7 @@ function makePDF(){
  y-=headerH;
  children.forEach((name,i)=>{
    x=left;
-   const vals=[name,...meals.map((_,j)=>d[i+"-"+j]==="yes"?"SI":d[i+"-"+j]==="no"?"NO":"")];
+   const vals=[name,...meals.map((_,j)=>({yes:"SI",no:"NO",poco:"Poco",meta:"Metà",abbondante:"Abbondante"}[d[i+"-"+j]]||""))];
    vals.forEach((v,j)=>{
      rect(x,y-rowH,cols[j],rowH);
      if(v){
